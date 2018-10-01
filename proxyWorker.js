@@ -150,105 +150,112 @@ window.requestAnimationFrame = (function() {
   };
 })();
 
+function CanvasProxy(){
+  EventListener.call(this);
+  var canvas = this;
+  canvas.ensureData = function canvas_ensureData() {
+    if (!canvas.data || canvas.data.width !== canvas.width || canvas.data.height !== canvas.height) {
+      canvas.data = {
+        width: canvas.width,
+        height: canvas.height,
+        data: new Uint8Array(canvas.width*canvas.height*4)
+      };
+      if (canvas === Module['canvas']) {
+        postMessage({ target: 'canvas', op: 'resize', width: canvas.width, height: canvas.height });
+      }
+    }
+  };
+  canvas.getContext = function canvas_getContext(type, attributes) {
+    if (canvas === Module['canvas']) {
+      postMessage({ target: 'canvas', op: 'getContext', type: type, attributes: attributes });
+    }
+    if (type === '2d') {
+      return {
+        getImageData: function(x, y, w, h) {
+          assert(x == 0 && y == 0 && w == canvas.width && h == canvas.height);
+          canvas.ensureData();
+          return {
+            width: canvas.data.width,
+            height: canvas.data.height,
+            data: new Uint8Array(canvas.data.data) // TODO: can we avoid this copy?
+          };
+        },
+        putImageData: function(image, x, y) {
+          canvas.ensureData();
+          assert(x == 0 && y == 0 && image.width == canvas.width && image.height == canvas.height);
+          canvas.data.data.set(image.data); // TODO: can we avoid this copy?
+          if (canvas === Module['canvas']) {
+            postMessage({ target: 'canvas', op: 'render', image: canvas.data });
+          }
+        },
+        drawImage: function(image, x, y, w, h, ox, oy, ow, oh) {
+          assert (!x && !y && !ox && !oy);
+          assert(w === ow && h === oh);
+          assert(canvas.width === w || w === undefined);
+          assert(canvas.height === h || h === undefined);
+          assert(image.width === canvas.width && image.height === canvas.height);
+          canvas.ensureData();
+          canvas.data.data.set(image.data.data); // TODO: can we avoid this copy?
+          if (canvas === Module['canvas']) {
+            postMessage({ target: 'canvas', op: 'render', image: canvas.data });
+          }
+        }
+      };
+    } else {
+      return webGLWorker;
+    }
+  };
+  canvas.boundingClientRect = {};
+  canvas.getBoundingClientRect = function canvas_getBoundingClientRect() {
+    return {
+      width: canvas.boundingClientRect.width,
+      height: canvas.boundingClientRect.height,
+      top: canvas.boundingClientRect.top,
+      left: canvas.boundingClientRect.left,
+      bottom: canvas.boundingClientRect.bottom,
+      right: canvas.boundingClientRect.right
+    };
+  };
+  canvas.style = new PropertyBag();
+  canvas.exitPointerLock = function(){};
+
+  canvas.width_ = canvas.width_ || 0;
+  canvas.height_ = canvas.height_ || 0;
+  Object.defineProperty(canvas, 'width', {
+    set: function(value) {
+      canvas.width_ = value;
+      if (canvas === Module['canvas']) {
+        postMessage({ target: 'canvas', op: 'resize', width: canvas.width_, height: canvas.height_ });
+      }
+    },
+    get: function() {
+      return canvas.width_;
+    }
+  });
+  Object.defineProperty(canvas, 'height', {
+    set: function(value) {
+      canvas.height_ = value;
+      if (canvas === Module['canvas']) {
+        postMessage({ target: 'canvas', op: 'resize', width: canvas.width_, height: canvas.height_ });
+      }
+    },
+    get: function() {
+      return canvas.height_;
+    }
+  });
+}
+
+// TODO: rename to WebGLWorkerContext or something
 var webGLWorker = new WebGLWorker();
+
+webGLWorker.canvas = new CanvasProxy();
 
 var document = new EventListener();
 
 document.createElement = function document_createElement(what) {
   switch(what) {
     case 'canvas': {
-      var canvas = new EventListener();
-      canvas.ensureData = function canvas_ensureData() {
-        if (!canvas.data || canvas.data.width !== canvas.width || canvas.data.height !== canvas.height) {
-          canvas.data = {
-            width: canvas.width,
-            height: canvas.height,
-            data: new Uint8Array(canvas.width*canvas.height*4)
-          };
-          if (canvas === Module['canvas']) {
-            postMessage({ target: 'canvas', op: 'resize', width: canvas.width, height: canvas.height });
-          }
-        }
-      };
-      canvas.getContext = function canvas_getContext(type, attributes) {
-        if (canvas === Module['canvas']) {
-          postMessage({ target: 'canvas', op: 'getContext', type: type, attributes: attributes });
-        }
-        if (type === '2d') {
-          return {
-            getImageData: function(x, y, w, h) {
-              assert(x == 0 && y == 0 && w == canvas.width && h == canvas.height);
-              canvas.ensureData();
-              return {
-                width: canvas.data.width,
-                height: canvas.data.height,
-                data: new Uint8Array(canvas.data.data) // TODO: can we avoid this copy?
-              };
-            },
-            putImageData: function(image, x, y) {
-              canvas.ensureData();
-              assert(x == 0 && y == 0 && image.width == canvas.width && image.height == canvas.height);
-              canvas.data.data.set(image.data); // TODO: can we avoid this copy?
-              if (canvas === Module['canvas']) {
-                postMessage({ target: 'canvas', op: 'render', image: canvas.data });
-              }
-            },
-            drawImage: function(image, x, y, w, h, ox, oy, ow, oh) {
-              assert (!x && !y && !ox && !oy);
-              assert(w === ow && h === oh);
-              assert(canvas.width === w || w === undefined);
-              assert(canvas.height === h || h === undefined);
-              assert(image.width === canvas.width && image.height === canvas.height);
-              canvas.ensureData();
-              canvas.data.data.set(image.data.data); // TODO: can we avoid this copy?
-              if (canvas === Module['canvas']) {
-                postMessage({ target: 'canvas', op: 'render', image: canvas.data });
-              }
-            }
-          };
-        } else {
-          return webGLWorker;
-        }
-      };
-      canvas.boundingClientRect = {};
-      canvas.getBoundingClientRect = function canvas_getBoundingClientRect() {
-        return {
-          width: canvas.boundingClientRect.width,
-          height: canvas.boundingClientRect.height,
-          top: canvas.boundingClientRect.top,
-          left: canvas.boundingClientRect.left,
-          bottom: canvas.boundingClientRect.bottom,
-          right: canvas.boundingClientRect.right
-        };
-      };
-      canvas.style = new PropertyBag();
-      canvas.exitPointerLock = function(){};
-
-      canvas.width_ = canvas.width_ || 0;
-      canvas.height_ = canvas.height_ || 0;
-      Object.defineProperty(canvas, 'width', {
-        set: function(value) {
-          canvas.width_ = value;
-          if (canvas === Module['canvas']) {
-            postMessage({ target: 'canvas', op: 'resize', width: canvas.width_, height: canvas.height_ });
-          }
-        },
-        get: function() {
-          return canvas.width_;
-        }
-      });
-      Object.defineProperty(canvas, 'height', {
-        set: function(value) {
-          canvas.height_ = value;
-          if (canvas === Module['canvas']) {
-            postMessage({ target: 'canvas', op: 'resize', width: canvas.width_, height: canvas.height_ });
-          }
-        },
-        get: function() {
-          return canvas.height_;
-        }
-      });
-
+      var canvas = new CanvasProxy();
       return canvas;
     }
     default: throw 'document.createElement ' + what;
