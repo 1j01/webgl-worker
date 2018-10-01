@@ -248,7 +248,6 @@ function CanvasProxy(){
 // TODO: rename to WebGLWorkerContext or something
 var webGLWorker = new WebGLWorker();
 
-webGLWorker.canvas = new CanvasProxy();
 
 var document = new EventListener();
 
@@ -297,6 +296,7 @@ Audio.prototype.cloneNode = function() {
 }
 
 Module.canvas = document.createElement('canvas');
+webGLWorker.canvas = Module.canvas;
 
 Module.setStatus = function(){};
 
@@ -400,6 +400,7 @@ onmessage = function onmessage(message) {
       Module.canvas = document.createElement('canvas');
       Module.canvas.width_ = message.data.width;
       Module.canvas.height_ = message.data.height;
+      webGLWorker.canvas = Module.canvas;
       removeRunDependency('worker-init');
       break;
     }
