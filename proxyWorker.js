@@ -254,8 +254,7 @@ var document = new EventListener();
 document.createElement = function document_createElement(what) {
   switch(what) {
     case 'canvas': {
-      var canvas = new CanvasProxy();
-      return canvas;
+      return new CanvasProxy();
     }
     default: throw 'document.createElement ' + what;
   }
