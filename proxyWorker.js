@@ -391,8 +391,6 @@ onmessage = function onmessage(message) {
       break;
     }
     case 'worker-init': {
-      Module.canvas = document.createElement('canvas');
-      webGLWorker.canvas = Module.canvas;
       Module.canvas.width_ = message.data.width;
       Module.canvas.height_ = message.data.height;
       removeRunDependency('worker-init');
