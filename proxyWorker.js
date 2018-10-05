@@ -290,6 +290,7 @@ Audio.prototype.cloneNode = function() {
 }
 
 Module.canvas = document.createElement('canvas');
+webGLWorker.canvas = Module.canvas;
 
 Module.setStatus = function(){};
 
@@ -391,6 +392,7 @@ onmessage = function onmessage(message) {
     }
     case 'worker-init': {
       Module.canvas = document.createElement('canvas');
+      webGLWorker.canvas = Module.canvas;
       Module.canvas.width_ = message.data.width;
       Module.canvas.height_ = message.data.height;
       removeRunDependency('worker-init');
